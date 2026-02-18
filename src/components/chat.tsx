@@ -54,6 +54,8 @@ export default function Chat() {
   // İlk yüklemede mesajları çek
   useEffect(() => {
     const fetchMessages = async () => {
+      if (!supabase) return;
+      
       const { data, error: fetchError } = await supabase
         .from("messages")
         .select("*")
@@ -70,6 +72,8 @@ export default function Chat() {
 
   // Realtime: yeni mesajlara subscribe (başka kullanıcılar + kendi insert'in Realtime'ı)
   useEffect(() => {
+    if (!supabase) return;
+    
     const channel = supabase
       .channel("messages-realtime")
       .on(
@@ -89,7 +93,9 @@ export default function Chat() {
       });
 
     return () => {
-      supabase.removeChannel(channel);
+      if (supabase) {
+        supabase.removeChannel(channel);
+      }
     };
   }, []);
 
@@ -110,6 +116,12 @@ export default function Chat() {
     const finalUsername = username.trim() || DEFAULT_USERNAME;
 
     // Insert ve dönen satırı al (id, created_at dahil). Böylece hemen UI'da görünür.
+    if (!supabase) {
+      setError("Supabase client not initialized");
+      setLoading(false);
+      return;
+    }
+    
     const { data, error: insertError } = await supabase
       .from("messages")
       .insert({ username: finalUsername, content })
