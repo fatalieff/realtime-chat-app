@@ -16,7 +16,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Message } from "@/app/types";
+import { Message } from "../app/types";
 
 const DEFAULT_USERNAME = "Guest";
 
