@@ -74,30 +74,28 @@ export default function Chat() {
   useEffect(() => {
     if (!supabase) return;
     
-    const channel = supabase
-      .channel("messages-realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        (payload) => {
-          const newMsg = payload.new as Message;
-          setMessages((prev) => {
-            // Aynı mesaj zaten varsa ekleme (kendi insert'ten hem .select() hem Realtime gelebilir)
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
-          });
-        }
-      )
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR") setError("Realtime bağlantı hatası.");
-      });
-
-    return () => {
-      if (supabase) {
-        supabase.removeChannel(channel);
+useEffect(() => {
+  const channel = supabase
+    .channel("messages")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+      },
+      (payload) => {
+        setMessages((prev) => [...prev, payload.new as Message]);
       }
-    };
-  }, []);
+    )
+    .subscribe((status) => {
+      console.log("Realtime status:", status);
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
 
   // Mesaj listesi değişince en alta scroll
   useEffect(() => {
