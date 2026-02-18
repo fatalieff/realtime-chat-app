@@ -15,7 +15,7 @@
  * 3. Tablo: id (uuid, default gen_random_uuid()), username (text), content (text), created_at (timestamptz, default now()).
  */
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "../../lib/supabaseClient";
 import { Message } from "../app/types";
 
 const DEFAULT_USERNAME = "Guest";
