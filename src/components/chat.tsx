@@ -109,13 +109,16 @@ export default function Chat() {
     }
 
     if (data) {
-      setMessages((prev) => {
-        const msg = data as Message;
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
-      setNewMessage("");
+  setMessages((prev) => {
+    const msg = data as Message;
+    // Eğer mesaj listede zaten varsa (ID kontrolü), tekrar ekleme!
+    if (prev.some((m) => m.id === msg.id)) {
+      return prev;
     }
+    return [...prev, msg];
+  });
+  setNewMessage("");
+}
   };
 
   return (
