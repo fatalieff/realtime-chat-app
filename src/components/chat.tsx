@@ -51,7 +51,8 @@ export default function Chat() {
   // Realtime: subscribe to new messages
   useEffect(() => {
     if (!supabase) return;
-    const channel = supabase
+    const client = supabase;
+    const channel = client
       .channel("messages")
       .on(
         "postgres_changes",
@@ -68,7 +69,7 @@ export default function Chat() {
         console.log("Realtime status:", status);
       });
     return () => {
-      supabase.removeChannel(channel);
+      client.removeChannel(channel);
     };
   }, []);
 
