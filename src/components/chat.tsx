@@ -62,7 +62,11 @@ export default function Chat() {
           table: "messages",
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message]);
+          setMessages((prev) => {
+            const msg = payload.new as Message;
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
         }
       )
       .subscribe((status) => {
@@ -88,14 +92,15 @@ export default function Chat() {
 
     const finalUsername = username.trim() || DEFAULT_USERNAME;
 
-    // Insert and get returned row (id, created_at included). This way it appears in UI immediately.
     if (!supabase) {
       setError("Supabase client not initialized");
       setLoading(false);
       return;
     }
-    
-    const { data, error: insertError } = await supabase
+
+    // Insert and get row so we can show it immediately. Subscription also receives INSERT
+    // but dedupes by id, so no duplicate.
+    const { data: inserted, error: insertError } = await supabase
       .from("messages")
       .insert({ username: finalUsername, content })
       .select("*")
@@ -108,17 +113,13 @@ export default function Chat() {
       return;
     }
 
-    if (data) {
-  setMessages((prev) => {
-    const msg = data as Message;
-    // Eğer mesaj listede zaten varsa (ID kontrolü), tekrar ekleme!
-    if (prev.some((m) => m.id === msg.id)) {
-      return prev;
+    if (inserted) {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === (inserted as Message).id)) return prev;
+        return [...prev, inserted as Message];
+      });
     }
-    return [...prev, msg];
-  });
-  setNewMessage("");
-}
+    setNewMessage("");
   };
 
   return (
