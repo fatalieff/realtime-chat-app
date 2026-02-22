@@ -1,15 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 
 type Tab = "login" | "register";
 
 export default function LandingPage() {
   const router = useRouter();
+  const { user, loading } = useAuth();
   const [tab, setTab] = useState<Tab>("login");
+
+  // Giriş yapmış kullanıcıyı /chat'e yönlendir (ters koruma)
+  useEffect(() => {
+    if (loading) return;
+    if (user) {
+      router.replace("/chat");
+      return;
+    }
+  }, [user, loading, router]);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -107,6 +118,21 @@ export default function LandingPage() {
       setRegLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-background via-surface to-background flex items-center justify-center p-4 safe-area-inset">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-text-muted text-sm sm:text-base">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return null; // Redirect to /chat in progress
+  }
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-background via-surface to-background flex items-center justify-center p-3 sm:p-4 safe-area-inset">

@@ -12,7 +12,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      router.replace("/");
+      router.replace("/"); // Giriş sayfasına yönlendir (login ana sayfada)
       return;
     }
   }, [user, loading, router]);
