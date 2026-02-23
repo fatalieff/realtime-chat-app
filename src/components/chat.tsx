@@ -42,7 +42,7 @@ export default function Chat() {
   // Bildirim sesi için audio nesnesini hazırla
   useEffect(() => {
     if (typeof window === "undefined") return;
-    notificationSoundRef.current = new Audio("/pop.mp3");
+    notificationSoundRef.current = new Audio("../../public/universfield-new-notification-024-370048.mp3");
   }, []);
 
   // 2. Mesajları Çek
