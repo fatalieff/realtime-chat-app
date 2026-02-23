@@ -28,7 +28,7 @@ export default function Chat() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const channelRef = useRef<any>(null);
 
   const username = authUsername || user?.email?.split("@")[0] || DEFAULT_USERNAME;
 
