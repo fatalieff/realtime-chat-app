@@ -49,8 +49,10 @@ export default function Chat() {
   useEffect(() => {
     if (!supabase || !user) return;
 
+    const client = supabase;
+
     // Mesaj Dinleyici (Postgres Changes)
-    const msgChannel = supabase.channel("db-messages")
+    const msgChannel = client.channel("db-messages")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
         const msg = payload.new as Message;
         setMessages((prev) => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
@@ -58,7 +60,7 @@ export default function Chat() {
       .subscribe();
 
     // Yazıyor Dinleyici (Broadcast)
-    const tChannel = supabase.channel("typing-room", {
+    const tChannel = client.channel("typing-room", {
       config: { broadcast: { self: false } }
     })
     .on("broadcast", { event: "typing" }, (payload) => {
@@ -77,8 +79,8 @@ export default function Chat() {
     typingChannelRef.current = tChannel;
 
     return () => {
-      supabase.removeChannel(msgChannel);
-      supabase.removeChannel(tChannel);
+      client.removeChannel(msgChannel);
+      client.removeChannel(tChannel);
     };
   }, [user, username]);
 
