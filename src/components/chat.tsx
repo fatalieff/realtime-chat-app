@@ -20,6 +20,7 @@ export default function Chat() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingChannelRef = useRef<RealtimeChannel | null>(null);
   const typingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const username = authUsername || user?.email?.split("@")[0] || DEFAULT_USERNAME;
 
@@ -29,6 +30,20 @@ export default function Chat() {
       router.push("/"); 
     }
   }, [user, authLoading, router]);
+
+  // Bildirim izni iste (sadece istemci tarafında)
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof Notification === "undefined") return;
+    if (Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  // Bildirim sesi için audio nesnesini hazırla
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    notificationSoundRef.current = new Audio("/pop.mp3");
+  }, []);
 
   // 2. Mesajları Çek
   useEffect(() => {
@@ -55,6 +70,30 @@ export default function Chat() {
     const msgChannel = client.channel("db-messages")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
         const msg = payload.new as Message;
+
+        const isMe = msg.username === username;
+
+        // Sadece başkasının mesajında ses & tarayıcı bildirimi
+        if (!isMe) {
+          // Ses efekti
+          if (notificationSoundRef.current) {
+            notificationSoundRef.current.currentTime = 0;
+            notificationSoundRef.current.play().catch(() => {});
+          }
+
+          // Tarayıcı bildirimi (sekme gizliyken)
+          if (
+            typeof document !== "undefined" &&
+            typeof Notification !== "undefined" &&
+            document.hidden &&
+            Notification.permission === "granted"
+          ) {
+            new Notification("Yeni mesaj", {
+              body: `${msg.username}: ${msg.content}`,
+            });
+          }
+        }
+
         setMessages((prev) => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
       })
       .subscribe();
@@ -81,6 +120,12 @@ export default function Chat() {
     return () => {
       client.removeChannel(msgChannel);
       client.removeChannel(tChannel);
+
+       // Typing timeout'larını temizle
+       Object.values(typingTimeoutsRef.current).forEach((timeoutId) => clearTimeout(timeoutId));
+       typingTimeoutsRef.current = {};
+
+       typingChannelRef.current = null;
     };
   }, [user, username]);
 
@@ -109,13 +154,6 @@ export default function Chat() {
     if (insError) {
       setError(insError.message);
       return;
-    }
-
-    if (data) {
-      const inserted = data as Message;
-      setMessages((prev) =>
-        prev.some((m) => m.id === inserted.id) ? prev : [...prev, inserted]
-      );
     }
 
     setNewMessage(""); // Input'u temizle
