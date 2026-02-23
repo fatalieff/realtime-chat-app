@@ -156,6 +156,14 @@ export default function Chat() {
       return;
     }
 
+    // Mesajın anında görünmesi için optimistic update
+    if (data) {
+      const inserted = data as Message;
+      setMessages((prev) =>
+        prev.some((m) => m.id === inserted.id) ? prev : [...prev, inserted]
+      );
+    }
+
     setNewMessage(""); // Input'u temizle
   };
 
