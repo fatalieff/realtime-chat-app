@@ -26,6 +26,9 @@ export default function Chat() {
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const username = authUsername || user?.email?.split("@")[0] || DEFAULT_USERNAME;
 
@@ -48,7 +51,7 @@ export default function Chat() {
     fetchMessages();
   }, []);
 
-  // Realtime: subscribe to new messages
+  // Realtime: subscribe to new messages & typing indicator
   useEffect(() => {
     if (!supabase) return;
     const client = supabase;
@@ -69,11 +72,35 @@ export default function Chat() {
           });
         }
       )
+      .on("broadcast", { event: "typing" }, (payload) => {
+        const typingUser = (payload.payload as { username?: string } | null)?.username;
+        if (!typingUser || typingUser === username) return;
+
+        setTypingUsers((prev) => {
+          if (prev.includes(typingUser)) return prev;
+          return [...prev, typingUser];
+        });
+
+        if (typingTimeoutsRef.current[typingUser]) {
+          clearTimeout(typingTimeoutsRef.current[typingUser]);
+        }
+
+        typingTimeoutsRef.current[typingUser] = setTimeout(() => {
+          setTypingUsers((prev) => prev.filter((u) => u !== typingUser));
+          delete typingTimeoutsRef.current[typingUser];
+        }, 2500);
+      })
       .subscribe((status) => {
         console.log("Realtime status:", status);
       });
+
+    channelRef.current = channel;
+
     return () => {
+      Object.values(typingTimeoutsRef.current).forEach((timeoutId) => clearTimeout(timeoutId));
+      typingTimeoutsRef.current = {};
       client.removeChannel(channel);
+      channelRef.current = null;
     };
   }, []);
 
@@ -120,6 +147,20 @@ export default function Chat() {
       });
     }
     setNewMessage("");
+  };
+
+  const handleTypingChange = (value: string) => {
+    setNewMessage(value);
+
+    const finalUsername = (username.trim() || DEFAULT_USERNAME);
+    const channel = channelRef.current;
+    if (!channel) return;
+
+    channel.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { username: finalUsername },
+    });
   };
 
   return (
@@ -228,7 +269,7 @@ export default function Chat() {
                 type="text"
                 placeholder="Type your message..."
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                onChange={(e) => handleTypingChange(e.target.value)}
                 className="w-full bg-surface/50 border border-border rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all resize-none touch-manipulation"
                 disabled={loading}
               />
