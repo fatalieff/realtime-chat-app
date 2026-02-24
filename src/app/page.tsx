@@ -13,7 +13,7 @@ export default function LandingPage() {
   const { user, loading } = useAuth();
   const [tab, setTab] = useState<Tab>("login");
 
-  // Giriş yapmış kullanıcıyı /chat'e yönlendir (ters koruma)
+  // Daxil olmuş istifadəçini /chat-ə yönləndir (tərs qoruma)
   useEffect(() => {
     if (loading) return;
     if (user) {
@@ -22,13 +22,13 @@ export default function LandingPage() {
     }
   }, [user, loading, router]);
 
-  // Login state
+  // Login vəziyyəti
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Register state
+  // Qeydiyyat vəziyyəti
   const [regEmail, setRegEmail] = useState("");
   const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
@@ -131,7 +131,7 @@ export default function LandingPage() {
   }
 
   if (user) {
-    return null; // Redirect to /chat in progress
+    return null; // /chat-ə yönləndirmə gedir
   }
 
   return (
@@ -142,7 +142,7 @@ export default function LandingPage() {
             Supabase connection not found. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your .env.local file.
           </div>
         )}
-        {/* Info / Hero card */}
+        {/* Məlumat / əsas (hero) kart */}
         <div className="glass rounded-t-2xl sm:rounded-t-2xl border border-border p-5 sm:p-8 text-center animate-fade-in">
           <div className="w-14 h-14 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 bg-gradient-to-br from-primary to-primary-dark rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg">
             <svg
@@ -167,7 +167,7 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* Tabs */}
+        {/* Vərəqlər (tabs) */}
         <div className="glass border-x border-border p-1.5 sm:p-2 flex gap-1 animate-slide-in">
           <button
             type="button"
@@ -193,7 +193,7 @@ export default function LandingPage() {
           </button>
         </div>
 
-        {/* Forms */}
+        {/* Formlar */}
         <div className="glass rounded-b-2xl border border-t-0 border-border p-4 sm:p-6 animate-fade-in">
           {tab === "login" && (
             <form onSubmit={handleLogin} className="space-y-4">

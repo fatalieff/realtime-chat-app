@@ -57,14 +57,14 @@ export default function Chat() {
   const avatarGradientFor = (name: string) =>
     avatarGradients[hashString(name) % avatarGradients.length];
 
-  // 1. GÜVENLİK: Private Route (Login Olmayan Girerse Atar)
+  // 1. TƏHLÜKƏSİZLİK: Şəxsi marşrut (daxil olmayan istifadəçi atılır)
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/");
     }
   }, [user, authLoading, router]);
 
-  // Bildirim izni iste (sadece istemci tarafında)
+  // Bildiriş icazəsi istə (yalnız müştəri tərəfində)
   useEffect(() => {
     if (typeof window === "undefined" || typeof Notification === "undefined")
       return;
@@ -73,7 +73,7 @@ export default function Chat() {
     }
   }, []);
 
-  // Bildirim sesi için audio nesnesini hazırla
+  // Bildiriş səsi üçün audio obyektini hazırla
   useEffect(() => {
     if (typeof window === "undefined") return;
     notificationSoundRef.current = new Audio(
@@ -81,7 +81,7 @@ export default function Chat() {
     );
   }, []);
 
-  // 2. Mesajları Çek
+  // 2. Mesajları gətir
   useEffect(() => {
     const fetchMessages = async () => {
       if (!supabase || !user) return;
@@ -96,13 +96,13 @@ export default function Chat() {
     fetchMessages();
   }, [user]);
 
-  // 3. REALTIME: Yeni Mesajlar & Yazıyor... Dinleyicisi
+  // 3. REALTIME: Yeni mesajlar və "yazır..." dinləyicisi
   useEffect(() => {
     if (!supabase || !user) return;
 
     const client = supabase;
 
-    // Mesaj Dinleyici (Postgres Changes)
+    // Mesaj dinləyicisi (Postgres dəyişiklikləri)
     const msgChannel = client
       .channel("db-messages")
       .on(
@@ -113,15 +113,15 @@ export default function Chat() {
 
           const isMe = msg.username === username;
 
-          // Sadece başkasının mesajında ses & tarayıcı bildirimi
+          // Yalnız başqasının mesajında səs və brauzer bildirişi
           if (!isMe) {
-            // Ses efekti
+            // Səs effekti
             if (notificationSoundRef.current) {
               notificationSoundRef.current.currentTime = 0;
               notificationSoundRef.current.play().catch(() => {});
             }
 
-            // Tarayıcı bildirimi (sekme gizliyken)
+            // Brauzer bildirişi (səkmə gizli olanda)
             if (
               typeof document !== "undefined" &&
               typeof Notification !== "undefined" &&
@@ -141,7 +141,7 @@ export default function Chat() {
       )
       .subscribe();
 
-    // Yazıyor Dinleyici (Broadcast)
+    // "Yazır" dinləyicisi (broadcast)
     const tChannel = client
       .channel("typing-room", {
         config: { broadcast: { self: false } },
@@ -168,7 +168,7 @@ export default function Chat() {
       client.removeChannel(msgChannel);
       client.removeChannel(tChannel);
 
-      // Typing timeout'larını temizle
+      // Yazma timeout-larını təmizlə
       Object.values(typingTimeoutsRef.current).forEach((timeoutId) =>
         clearTimeout(timeoutId),
       );
@@ -178,12 +178,12 @@ export default function Chat() {
     };
   }, [user, username]);
 
-  // Otomatik Scroll
+  // Avtomatik scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUsers]);
 
-  // Mesaj Gönderme (hemen listeye yansıt + Realtime yine de çalışsın)
+  // Mesaj göndərmə (dərhal siyahıya əlavə et, Realtime yenə də işləsin)
   const handleSend = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const content = newMessage.trim();
@@ -205,7 +205,7 @@ export default function Chat() {
       return;
     }
 
-    // Mesajın anında görünmesi için optimistic update
+    // Mesajın dərhal görünməsi üçün optimistik yeniləmə
     if (data) {
       const inserted = data as Message;
       setMessages((prev) =>
@@ -213,10 +213,10 @@ export default function Chat() {
       );
     }
 
-    setNewMessage(""); // Input'u temizle
+    setNewMessage(""); // Input-u təmizlə
   };
 
-  // Yazıyor Sinyali
+  // "Yazır" siqnalı
   const handleTyping = (val: string) => {
     setNewMessage(val);
     typingChannelRef.current?.send({
@@ -226,7 +226,7 @@ export default function Chat() {
     });
   };
 
-  // Online Users
+  // Onlayn istifadəçilər
   useEffect(() => {
     if (!supabase || !user) return;
 
@@ -237,13 +237,13 @@ export default function Chat() {
   
     roomOne
       .on("presence", { event: "sync" }, () => {
-        // sync olayında presenceState'i bir değişkene alıp temizliyoruz
+        // sync hadisəsində presenceState-i dəyişənə alıb təmizləyirik
         const state = roomOne.presenceState();
         
-        // Supabase formatını (anahtarlı obje) düz bir listeye çeviriyoruz
+        // Supabase formatını (açar-obyekt) sadə siyahıya çeviririk
         const formattedUsers = Object.keys(state).map((key) => ({
           username: key,
-          presenceInfo: state[key][0], // Track edilen ilk bilgiyi al
+          presenceInfo: state[key][0], // Track olunan ilk məlumatı götür
         }));
   
         setOnlineUsers(formattedUsers);
@@ -261,7 +261,7 @@ export default function Chat() {
     };
   }, [user, username]);
 
-  // Mobile online drawer: ESC + scroll lock
+  // Mobil onlayn siyahı: ESC + scroll kilidi
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!isOnlineDrawerOpen) return;
@@ -280,7 +280,7 @@ export default function Chat() {
     };
   }, [isOnlineDrawerOpen]);
 
-  if (authLoading || !user) return null; // Yüklenirken boş ekran (flicker önleyici)
+  if (authLoading || !user) return null; // Yüklənərkən boş ekran (flicker-in qarşısını almaq üçün)
 
   const onlineUsersContent =
     onlineUsers.length > 0 ? (
@@ -332,9 +332,9 @@ export default function Chat() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-surface to-background p-2 sm:p-4">
       <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row gap-3 sm:gap-4">
-        {/* Main chat */}
+        {/* Əsas söhbət sahəsi */}
         <div className="w-full flex flex-col flex-1 lg:max-h-[calc(100dvh-2rem)] min-w-0">
-          {/* Header */}
+          {/* Başlıq */}
           <div className="glass rounded-t-2xl p-3 sm:p-6 border border-border flex-shrink-0">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center justify-between gap-3">
@@ -344,7 +344,7 @@ export default function Chat() {
                   </h1>
                 </div>
 
-                {/* Mobile: Online drawer trigger */}
+                {/* Mobil: onlayn siyahını açan düymə */}
                 <button
                   type="button"
                   onClick={() => setIsOnlineDrawerOpen(true)}
@@ -392,18 +392,18 @@ export default function Chat() {
             </div>
           </div>
 
-          {/* Mesaj Alanı */}
+          {/* Mesaj sahəsi */}
           <div className="glass border-x border-border p-2 sm:p-4 flex-1 overflow-y-auto custom-scrollbar min-h-[300px]">
             <div className="flex flex-col gap-4">
               {" "}
-              {/* Flex-col ve gap eklendi */}
+              {/* Flex-col və gap əlavə edildi */}
               {error && (
                 <div className="p-3 rounded-xl bg-error/10 border border-error/30 text-error text-sm">
                   {error}
                 </div>
               )}
               {messages.map((msg) => {
-                const isMe = msg.username === username; // Mesaj bana mı ait?
+                const isMe = msg.username === username; // Mesaj mənəmi aiddir?
 
                 return (
                   <div
@@ -413,7 +413,7 @@ export default function Chat() {
                     <div
                       className={`flex items-end gap-2 max-w-[85%] ${isMe ? "flex-row-reverse" : "flex-row"}`}
                     >
-                      {/* Avatar - Sadece başkasının mesajında veya istersen her ikisinde */}
+                      {/* Avatar - yalnız başqasının mesajında və ya istəsən hər ikisində */}
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${isMe ? "bg-primary-dark" : "bg-accent"}`}
                       >
@@ -422,7 +422,7 @@ export default function Chat() {
                         </span>
                       </div>
 
-                      {/* Mesaj Balonu */}
+                      {/* Mesaj "balonu" */}
                       <div
                         className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
                       >
@@ -436,7 +436,7 @@ export default function Chat() {
                           <p className="text-sm leading-relaxed">{msg.content}</p>
                         </div>
 
-                        {/* Zaman ve İsim */}
+                        {/* Vaxt və ad */}
                         <div className="flex items-center gap-2 mt-1 px-1">
                           {!isMe && (
                             <span className="text-[10px] font-medium text-text-muted">
@@ -459,7 +459,7 @@ export default function Chat() {
             </div>
           </div>
 
-          {/* Yazıyor Göstergesi */}
+          {/* "Yazır" göstəricisi */}
           <div className="glass border-x border-border px-4 py-1">
             {typingUsers.length > 0 && (
               <p className="text-xs italic text-text-muted animate-pulse">
@@ -468,7 +468,7 @@ export default function Chat() {
             )}
           </div>
 
-          {/* Input */}
+          {/* Input sahəsi */}
           <div className="glass rounded-b-2xl border border-t-0 border-border p-2 sm:p-4">
             <form onSubmit={handleSend} className="flex gap-2">
               <input
@@ -488,7 +488,7 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Desktop sidebar */}
+        {/* Desktop yan panel */}
         <aside className="hidden lg:flex lg:w-80 xl:w-96">
           <div className="glass w-full rounded-2xl border border-border overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]">
             <div className="p-4 border-b border-border flex items-center justify-between">
@@ -515,7 +515,7 @@ export default function Chat() {
         </aside>
       </div>
 
-      {/* Mobile drawer */}
+      {/* Mobil siyahı (drawer) */}
       {isOnlineDrawerOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <button
