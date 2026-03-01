@@ -242,49 +242,56 @@ export default function Chat() {
     const roomOne = client.channel("room-1", {
       config: { presence: { key: presenceKeyRef.current } },
     });
-  
-    roomOne
-      .on("presence", { event: "sync" }, () => {
-        // Bütün bağlantılardan gələn presence məlumatlarını al
-        const state = roomOne.presenceState() as Record<
-          string,
-          { username?: string; online_at?: string }[]
-        >;
 
-        const allMetas = Object.values(state).flat();
+    let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-        // Eyni istifadəçi adı ilə birdən çox tab olsa belə, istifadəçini bir dəfə göstər
-        const uniqueByUsername = new Map<
-          string,
-          { username?: string; online_at?: string }
-        >();
+    const updateOnlineUsersFromState = () => {
+      const state = roomOne.presenceState() as Record<
+        string,
+        { username?: string; online_at?: string }[]
+      >;
 
-        for (const meta of allMetas) {
-          const name = (meta.username || "Unknown") as string;
-          if (!uniqueByUsername.has(name)) {
-            uniqueByUsername.set(name, meta);
-          }
+      const allMetas = Object.values(state).flat();
+
+      const uniqueByUsername = new Map<
+        string,
+        { username?: string; online_at?: string }
+      >();
+
+      for (const meta of allMetas) {
+        const name = (meta.username || "Unknown") as string;
+        if (!uniqueByUsername.has(name)) {
+          uniqueByUsername.set(name, meta);
         }
+      }
 
-        const formattedUsers: OnlineUser[] = Array.from(
-          uniqueByUsername.entries(),
-        ).map(([name, meta]) => ({
-          username: name,
-          presenceInfo: meta,
-        }));
+      const formattedUsers: OnlineUser[] = Array.from(
+        uniqueByUsername.entries(),
+      ).map(([name, meta]) => ({
+        username: name,
+        presenceInfo: meta,
+      }));
 
-        setOnlineUsers(formattedUsers);
-      })
+      setOnlineUsers(formattedUsers);
+    };
+
+    roomOne
+      .on("presence", { event: "sync" }, updateOnlineUsersFromState)
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await roomOne.track({
             username,
             online_at: new Date().toISOString(),
           });
+          // Yeniləmədən sonra sync bəzən gec gəlir; track() sonrası əl ilə yenilə
+          updateOnlineUsersFromState();
+          // Server state propagation üçün qısa gecikmə (digər istifadəçiləri görmək üçün)
+          retryTimeoutId = setTimeout(updateOnlineUsersFromState, 600);
         }
       });
-  
+
     return () => {
+      if (retryTimeoutId) clearTimeout(retryTimeoutId);
       client.removeChannel(roomOne);
     };
   }, [user, username]);
