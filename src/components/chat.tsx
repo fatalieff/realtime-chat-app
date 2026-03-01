@@ -33,7 +33,7 @@ export default function Chat() {
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [isOnlineDrawerOpen, setIsOnlineDrawerOpen] = useState(false);
-  const presenceKeyRef = useRef<string | null>(null);
+  const presenceChannelRef = useRef<RealtimeChannel | null>(null);
 
   const username =
     authUsername || user?.email?.split("@")[0] || DEFAULT_USERNAME;
@@ -233,14 +233,10 @@ export default function Chat() {
 
     const client = supabase;
 
-    // Presence açarı kimi istifadəçi ID-si (Supabase tövsiyəsi)
-    if (!presenceKeyRef.current) {
-      presenceKeyRef.current = user.id;
-    }
+    // Xüsusi key vermirik - Supabase hər bağlantı üçün unikal UUID yaradır (tab dəyişimi/yeniləmə üçün vacib)
+    const roomOne = client.channel("room-1");
 
-    const roomOne = client.channel("room-1", {
-      config: { presence: { key: presenceKeyRef.current } },
-    });
+    presenceChannelRef.current = roomOne;
 
     const handleSync = () => {
       const state = roomOne.presenceState() as Record<
@@ -252,11 +248,8 @@ export default function Chat() {
 
       Object.entries(state).forEach(([presenceKey, metas]) => {
         metas.forEach((meta) => {
-          // Yeni format: username meta içindədir
-          // Köhnə format ehtiyatı: presenceKey birbaşa istifadəçi adı kimi istifadə olunur
           const nameFromMeta = meta.username;
-          const nameFromKey = presenceKey;
-          const finalName = String(nameFromMeta || nameFromKey || "Unknown");
+          const finalName = String(nameFromMeta || presenceKey || "Unknown");
 
           flattened.push({
             username: finalName,
@@ -265,7 +258,6 @@ export default function Chat() {
         });
       });
 
-      // Eyni istifadəçini bir dəfə göstər (birdən çox tab olsa belə)
       const uniqueByUsername = new Map<string, OnlineUser>();
       flattened.forEach((u) => {
         if (!uniqueByUsername.has(u.username)) {
@@ -276,23 +268,71 @@ export default function Chat() {
       setOnlineUsers(Array.from(uniqueByUsername.values()));
     };
 
+    let retryT1: ReturnType<typeof setTimeout> | null = null;
+    let retryT2: ReturnType<typeof setTimeout> | null = null;
+
+    const doTrack = async () => {
+      await roomOne.track({
+        username,
+        online_at: new Date().toISOString(),
+      });
+      handleSync();
+      retryT1 = setTimeout(handleSync, 500);
+      retryT2 = setTimeout(handleSync, 1000);
+    };
+
     roomOne.on("presence", { event: "sync" }, handleSync);
 
     roomOne.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
-        await roomOne.track({
-          username,
-          online_at: new Date().toISOString(),
-        });
+        await doTrack();
       }
     });
 
     return () => {
+      if (retryT1) clearTimeout(retryT1);
+      if (retryT2) clearTimeout(retryT2);
+      presenceChannelRef.current = null;
       client.removeChannel(roomOne);
-      // Bu tab bağlanarkən yalnız bu komponent üçün siyahını boşaldırıq
-      setOnlineUsers([]);
     };
   }, [user, username]);
+
+  // Tab görünən olduqda presence-i yenilə (yeniləmə / tab dəyişimi sonrası)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const onVisible = () => {
+      const ch = presenceChannelRef.current;
+      if (!ch || !username) return;
+
+      ch.track({
+        username,
+        online_at: new Date().toISOString(),
+      }).then(() => {
+        const state = ch.presenceState() as Record<
+          string,
+          { username?: string; online_at?: string }[]
+        >;
+        const flattened: OnlineUser[] = [];
+        Object.entries(state).forEach(([, metas]) => {
+          metas.forEach((meta) => {
+            flattened.push({
+              username: String(meta.username || "Unknown"),
+              presenceInfo: meta,
+            });
+          });
+        });
+        const unique = new Map<string, OnlineUser>();
+        flattened.forEach((u) => {
+          if (!unique.has(u.username)) unique.set(u.username, u);
+        });
+        setOnlineUsers(Array.from(unique.values()));
+      });
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [username]);
 
   // Mobil onlayn siyahı: ESC + scroll kilidi
   useEffect(() => {
