@@ -227,72 +227,70 @@ export default function Chat() {
     });
   };
 
-  // Onlayn istifadəçilər
+  // Onlayn istifadəçilər (Supabase Realtime Presence)
   useEffect(() => {
     if (!supabase || !user || !username) return;
 
     const client = supabase;
-    // Hər tab / brauzer üçün stabil və unikal presence açarı
+
+    // Presence açarı kimi istifadəçi ID-si (Supabase tövsiyəsi)
     if (!presenceKeyRef.current) {
-      presenceKeyRef.current = `${username}-${Math.random()
-        .toString(36)
-        .slice(2)}`;
+      presenceKeyRef.current = user.id;
     }
 
     const roomOne = client.channel("room-1", {
       config: { presence: { key: presenceKeyRef.current } },
     });
 
-    let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const updateOnlineUsersFromState = () => {
+    const handleSync = () => {
       const state = roomOne.presenceState() as Record<
         string,
         { username?: string; online_at?: string }[]
       >;
 
-      const allMetas = Object.values(state).flat();
+      const flattened: OnlineUser[] = [];
 
-      const uniqueByUsername = new Map<
-        string,
-        { username?: string; online_at?: string }
-      >();
+      Object.entries(state).forEach(([presenceKey, metas]) => {
+        metas.forEach((meta) => {
+          // Yeni format: username meta içindədir
+          // Köhnə format ehtiyatı: presenceKey birbaşa istifadəçi adı kimi istifadə olunur
+          const nameFromMeta = meta.username;
+          const nameFromKey = presenceKey;
+          const finalName = String(nameFromMeta || nameFromKey || "Unknown");
 
-      for (const meta of allMetas) {
-        const name = (meta.username || "Unknown") as string;
-        if (!uniqueByUsername.has(name)) {
-          uniqueByUsername.set(name, meta);
-        }
-      }
-
-      const formattedUsers: OnlineUser[] = Array.from(
-        uniqueByUsername.entries(),
-      ).map(([name, meta]) => ({
-        username: name,
-        presenceInfo: meta,
-      }));
-
-      setOnlineUsers(formattedUsers);
-    };
-
-    roomOne
-      .on("presence", { event: "sync" }, updateOnlineUsersFromState)
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await roomOne.track({
-            username,
-            online_at: new Date().toISOString(),
+          flattened.push({
+            username: finalName,
+            presenceInfo: meta,
           });
-          // Yeniləmədən sonra sync bəzən gec gəlir; track() sonrası əl ilə yenilə
-          updateOnlineUsersFromState();
-          // Server state propagation üçün qısa gecikmə (digər istifadəçiləri görmək üçün)
-          retryTimeoutId = setTimeout(updateOnlineUsersFromState, 600);
+        });
+      });
+
+      // Eyni istifadəçini bir dəfə göstər (birdən çox tab olsa belə)
+      const uniqueByUsername = new Map<string, OnlineUser>();
+      flattened.forEach((u) => {
+        if (!uniqueByUsername.has(u.username)) {
+          uniqueByUsername.set(u.username, u);
         }
       });
 
+      setOnlineUsers(Array.from(uniqueByUsername.values()));
+    };
+
+    roomOne.on("presence", { event: "sync" }, handleSync);
+
+    roomOne.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await roomOne.track({
+          username,
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
+
     return () => {
-      if (retryTimeoutId) clearTimeout(retryTimeoutId);
       client.removeChannel(roomOne);
+      // Bu tab bağlanarkən yalnız bu komponent üçün siyahını boşaldırıq
+      setOnlineUsers([]);
     };
   }, [user, username]);
 
