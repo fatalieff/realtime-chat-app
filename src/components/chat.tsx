@@ -33,6 +33,7 @@ export default function Chat() {
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [isOnlineDrawerOpen, setIsOnlineDrawerOpen] = useState(false);
+  const presenceKeyRef = useRef<string | null>(null);
 
   const username =
     authUsername || user?.email?.split("@")[0] || DEFAULT_USERNAME;
@@ -228,29 +229,56 @@ export default function Chat() {
 
   // Onlayn istifadəçilər
   useEffect(() => {
-    if (!supabase || !user) return;
+    if (!supabase || !user || !username) return;
 
     const client = supabase;
+    // Hər tab / brauzer üçün stabil və unikal presence açarı
+    if (!presenceKeyRef.current) {
+      presenceKeyRef.current = `${username}-${Math.random()
+        .toString(36)
+        .slice(2)}`;
+    }
+
     const roomOne = client.channel("room-1", {
-      config: { presence: { key: username } },
+      config: { presence: { key: presenceKeyRef.current } },
     });
   
     roomOne
       .on("presence", { event: "sync" }, () => {
-        // sync hadisəsində presenceState-i dəyişənə alıb təmizləyirik
-        const state = roomOne.presenceState();
-        
-        // Supabase formatını (açar-obyekt) sadə siyahıya çeviririk
-        const formattedUsers = Object.keys(state).map((key) => ({
-          username: key,
-          presenceInfo: state[key][0], // Track olunan ilk məlumatı götür
+        // Bütün bağlantılardan gələn presence məlumatlarını al
+        const state = roomOne.presenceState() as Record<
+          string,
+          { username?: string; online_at?: string }[]
+        >;
+
+        const allMetas = Object.values(state).flat();
+
+        // Eyni istifadəçi adı ilə birdən çox tab olsa belə, istifadəçini bir dəfə göstər
+        const uniqueByUsername = new Map<
+          string,
+          { username?: string; online_at?: string }
+        >();
+
+        for (const meta of allMetas) {
+          const name = (meta.username || "Unknown") as string;
+          if (!uniqueByUsername.has(name)) {
+            uniqueByUsername.set(name, meta);
+          }
+        }
+
+        const formattedUsers: OnlineUser[] = Array.from(
+          uniqueByUsername.entries(),
+        ).map(([name, meta]) => ({
+          username: name,
+          presenceInfo: meta,
         }));
-  
+
         setOnlineUsers(formattedUsers);
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await roomOne.track({
+            username,
             online_at: new Date().toISOString(),
           });
         }
